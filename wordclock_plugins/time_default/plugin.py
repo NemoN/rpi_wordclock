@@ -1,6 +1,7 @@
 import datetime
 import os
 import time
+import time_thomas
 import time_german
 import time_swabian
 import time_dutch
@@ -29,6 +30,8 @@ class plugin:
             self.taw = time_swabian.time_swabian()
         elif language == 'dutch':
             self.taw = time_dutch.time_dutch()
+        elif language == 'thomas':
+            self.taw = time_thomas.time_thomas()
         else:
             print('Could not detect language: ' + language + '.')
             print('Choosing default: german')
