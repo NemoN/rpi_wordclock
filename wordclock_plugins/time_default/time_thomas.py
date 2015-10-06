@@ -10,7 +10,7 @@ class time_thomas():
         # ES IST
         self.prefix = range(0,2) + range(3,6)
         self.minutes=[[], \
-            # FÜNF NACH
+            # FUENF NACH
             range(7,11) + range(40,44), \
             # ZEHN NACH
             range(11,15) + range(40,44), \
@@ -18,11 +18,11 @@ class time_thomas():
             range(26,33) + range(40,44), \
             # ZWANZIG NACH
             range(15,22) + range(40,44), \
-            # FÜNF VOR HALB
+            # FUENF VOR HALB
             range(7,11) + range(33,36) + range(44,48), \
             # HALB
             range(44,48), \
-            # FÜNF NACH HALB
+            # FUENF NACH HALB
             range(7,11) + range(40,44) + range(44,48), \
             # ZWANZIG VOR
             range(15,22) + range(33,36), \
@@ -30,9 +30,9 @@ class time_thomas():
             range(26,33) + range(33,36), \
             # ZEHN VOR
             range(11,15) + range(33,36), \
-            # FÜNF VOR
+            # FUENF VOR
             range(7,11) + range(33,36) ]
-            # ZWÖLF
+            # ZWOELF
         self.hours= [range(94,99), \
             # EINS
             range(55,59), \
@@ -42,7 +42,7 @@ class time_thomas():
             range(66,70), \
             # VIER
             range(73,77), \
-            # FÜNF
+            # FUENF
             range(51,55), \
             # SECHS
             range(77,82), \
@@ -56,7 +56,7 @@ class time_thomas():
             range(99,103), \
             # ELF
             range(49,52), \
-            # ZWÖLF
+            # ZWOELF
             range(94,99)]
             # UHR
         self.full_hour= range(107,110)
