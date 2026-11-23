@@ -3,96 +3,98 @@
 
 import datetime
 import logging
-import os
-import wordclock_tools.wordclock_colors as wcc
 import random
+from time import monotonic
+
+import wordclock_tools.wordclock_colors as wcc
+
+
+FRAME_PERIOD = 1 / 30
+RAIN_SPEED = 10  # rows per second
 
 
 class plugin:
-    """
-    A class to display the current time (default mode).
-    This default mode needs to be adapted to the hardware
-    layout of the wordclock (the choosen stencil) and is
-    the most essential time display mode of the wordclock.
-    """
-
     def __init__(self, config):
-        """
-        Initializations for the startup of the current wordclock plugin
-        """
-        # Get plugin name (according to the folder, it is contained in)
-        self.name = os.path.dirname(__file__).split('/')[-1]
-        self.pretty_name = "Matrix with time"
-        self.description = "There is no spoon?"
-
+        self.name = 'time_matrix'
+        self.pretty_name = 'Matrix with time'
+        self.description = 'There is no spoon?'
         self.purist = config.getboolean('plugin_time_default', 'purist')
-
-        self.bg_color = wcc.BLACK  # default background color
-        self.word_color = wcc.WHITE  # default word color
-        self.minute_color = wcc.WHITE  # default minute color
-
         self.threshold = 0.9
-
-        # Colors from black to green (and a bit gray-ish)
-        self.colors = []
-        for i in range(0, 8):
-            self.colors.append(wcc.Color(0, int(255.0 / 10 * i), 0))
-        self.colors.append(wcc.Color(50, 204, 30))
-        self.colors.append(wcc.Color(50, 230, 30))
-        self.colors.append(wcc.Color(80, 255, 60))
+        self.colors = [(0, int(255.0 / 10 * i), 0) for i in range(8)]
+        self.colors.extend([(50, 204, 30), (50, 230, 30), (80, 255, 60)])
 
     def run(self, wcd, wci):
-        """
-        Displays time until aborted by user interaction on pin button_return
-        """
-        # initialize rain start: set to end coordinate
-        rain = [20 for _ in range(0, 11)]
+        width, height = wcd.get_wca_width(), wcd.get_wca_height()
+        rain = [None] * width
+        background = bytearray((width * height + 4) * 3)
+        previous_minute = None
+        started = previous = deadline = monotonic()
+        frames = 0
+
         while True:
-            # Check if text needs to be displayed
             if wcc.scrollenable:
                 try:
                     if datetime.datetime.now() > wcc.scrolldatetime:
                         wcd.showText(wcc.scrolltext)
-                        wcc.scrolldatetime = wcc.scrolldatetime + datetime.timedelta(seconds = wcc.scrollrepeat)
-                        print("Next scroll: ",wcc.scrolldatetime)
-                except:
-                    pass
+                        wcc.scrolldatetime += datetime.timedelta(seconds=wcc.scrollrepeat)
+                except Exception:
+                    logging.exception('Unable to display scheduled scroll text')
 
-            if not(wcc.scrollactive):
-                # Set background color
-                wcd.setColorToAll(self.bg_color, includeMinutes=True)
-                # Set current time
-                now = datetime.datetime.now()
-                # Returns indices, which represent the current time, when beeing illuminated
-                taw_indices = wcd.taw.get_time(now, self.purist)
+            now = monotonic()
+            elapsed = min(now - previous, 0.1)
+            previous = now
+            if not wcc.scrollactive:
+                clock_time = datetime.datetime.now()
+                minute = (clock_time.year, clock_time.month, clock_time.day,
+                          clock_time.hour, clock_time.minute)
+                if minute != previous_minute:
+                    background[:] = bytes(len(background))
+                    for index in wcd.taw.get_time(clock_time, self.purist):
+                        offset = index * 3
+                        background[offset:offset + 3] = b'\xff\xff\xff'
+                    for index in range(clock_time.minute % 5):
+                        offset = (width * height + index) * 3
+                        background[offset:offset + 3] = b'\xff\xff\xff'
+                    previous_minute = minute
 
-                wcd.setColorBy1DCoordinates(taw_indices, self.word_color)
-                wcd.setMinutes(now, self.minute_color)
+                frame = bytearray(background)
+                chance = 1 - self.threshold ** (elapsed / 0.1)
+                for x, position in enumerate(rain):
+                    if position is None:
+                        if random.random() < chance:
+                            rain[x] = 0.0
+                        continue
 
-                for x, y in enumerate(rain):
-                    if y == 20:
-                        # reset y coordinate randomly
-                        if random.random() > self.threshold:
-                            rain[x] = 0
-                    else:
-                        # simple alpha blending using our predefined colors
-                        y0 = max(y - 10, 0)
-                        y1 = min(9, y)
-                        ci = y0 - (y - 10)
-                        for yi, yn in enumerate(range(y0, y1 + 1)):
-                            color = self.colors[ci + yi]
-                            wcd.setColorBy2DCoordinates(x, yn, color)
-                        # advance y coordinate
-                        rain[x] = y + 1
+                    for y in range(max(0, int(position) - 10), min(height - 1, int(position)) + 1):
+                        level = y - position + 10
+                        if 0 <= level < 10:
+                            lower = int(level)
+                            fraction = level - lower
+                            color = bytes(int(a + (b - a) * fraction) for a, b in
+                                          zip(self.colors[lower], self.colors[lower + 1]))
+                        elif 10 <= level <= 11:
+                            color = bytes(int(c * (11 - level)) for c in self.colors[10])
+                        else:
+                            continue
+                        offset = (y * width + x) * 3
+                        frame[offset:offset + 3] = color
 
-                    wcd.show()
+                    position += RAIN_SPEED * elapsed
+                    rain[x] = None if position >= height + 10 else position
 
-            event = wci.waitForEvent(0.1)
-            if event == wci.EVENT_BUTTON_RETURN \
-                    or event == wci.EVENT_EXIT_PLUGIN \
-                    or event == wci.EVENT_NEXT_PLUGIN_REQUESTED:
+                wcd.show_rgb_frame(frame)
+                frames += 1
+
+            now = monotonic()
+            deadline = max(deadline + FRAME_PERIOD, now)
+            event = wci.waitForEvent(deadline - now)
+            if event in (wci.EVENT_BUTTON_RETURN, wci.EVENT_EXIT_PLUGIN,
+                         wci.EVENT_NEXT_PLUGIN_REQUESTED):
+                duration = monotonic() - started
+                logging.info('Time matrix: %d frames in %.2f s (%.2f fps)',
+                             frames, duration, frames / duration if duration else 0)
                 return
-            elif event == wci.EVENT_BUTTON_LEFT:
+            if event == wci.EVENT_BUTTON_LEFT:
                 self.threshold = min(0.95, self.threshold + 0.05)
             elif event == wci.EVENT_BUTTON_RIGHT:
                 self.threshold = max(0.7, self.threshold - 0.05)
