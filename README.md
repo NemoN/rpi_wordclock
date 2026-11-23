@@ -24,6 +24,16 @@
  * [Home Assistant integration](https://github.com/NemoN/rpi_wordclock_for_homeassistant#installation) with HACS and Marketplace installation, light controls, plugin selection (including DDP), virtual buttons, and scroll text.
  * Support for a brightness sensor (TSL2561)
   
+### Home Assistant discovery
+
+On Raspberry Pi OS, enable the Wordclock's local mDNS announcement with the included script. It requires a running `avahi-daemon` and defaults to HTTP port 80. Pass a different port if the Wordclock API uses one.
+
+```sh
+sudo ./scripts/enable-avahi-discovery.sh
+```
+
+Install the [Home Assistant integration](https://github.com/NemoN/rpi_wordclock_for_homeassistant#installation) and look for Wordclock under **Settings → Devices & services → Discovered**. Home Assistant must be able to receive the Pi's mDNS announcements. On networks where mDNS cannot reach Home Assistant, enter the host or IP manually.
+
 ### :books: Further reading
  * Exemplary builds are available at [pinterest](https://www.pinterest.de/berndkrolla/wordclock-gallery/)
  * [Roadmap](https://github.com/bk1285/rpi_wordclock/projects)
