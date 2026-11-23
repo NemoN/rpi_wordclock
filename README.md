@@ -21,7 +21,7 @@
      * Control the wordclock with a browser within your local network
      * Linking the webinterface to your smartphones homescreen provides an app-like usage of the interface
      * Hardware buttons are not mandatory anymore.
- * Integration to your instance of [home-assistant](https://www.home-assistant.io/) using [this repository](https://github.com/bk1285/rpi_wordclock_for_homeassistant/)
+ * [Home Assistant integration](https://github.com/NemoN/rpi_wordclock_for_homeassistant#installation) with HACS and Marketplace installation, light controls, plugin selection (including DDP), virtual buttons, and scroll text.
  * Support for a brightness sensor (TSL2561)
   
 ### :books: Further reading
