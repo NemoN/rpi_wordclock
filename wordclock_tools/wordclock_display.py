@@ -4,6 +4,7 @@ import itertools
 import logging
 import os
 from copy import copy, deepcopy
+from functools import lru_cache
 from PIL import Image
 from . import wiring
 from time import sleep
@@ -25,6 +26,11 @@ import wordclock_plugins.time_default.time_swedish as time_swedish
 import wordclock_tools.wordclock_colors as wcc
 import wordclock_tools.wordclock_screen as wordclock_screen
 import colorsys
+
+
+@lru_cache(maxsize=16)
+def _brightness_levels(brightness):
+    return bytes(channel * brightness // 255 for channel in range(256))
 
 
 class wordclock_display:
@@ -368,11 +374,18 @@ class wordclock_display:
             self.transition_cache_curr = current
 
             brightness = self.getBrightness()
+            show_on_strip = getattr(type(self.strip), 'show_rgb_frame', None)
+            if show_on_strip is not None:
+                if brightness != 255:
+                    frame = bytes(frame).translate(_brightness_levels(brightness))
+                show_on_strip(self.strip, frame)
+                return
+
             if brightness == 255:
                 def scale_color(color):
                     return color
             else:
-                levels = bytes(int(channel * brightness / 255) for channel in range(256))
+                levels = _brightness_levels(brightness)
 
                 def scale_color(color):
                     return wcc.Color(levels[color.r], levels[color.g], levels[color.b])
