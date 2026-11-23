@@ -1,48 +1,54 @@
+import logging
 import os
+from time import monotonic
+
 import wordclock_tools.wordclock_colors as wcc
 
-class plugin:
-    """
-    A class to display the current time (default mode).
-    This default mode needs to be adapted to the hardware
-    layout of the wordclock (the choosen stancil) and is
-    the most essential time display mode of the wordclock.
-    """
 
+FRAME_PERIOD = 1 / 30
+# The original advanced one color step every 50 ms, plus rendering time.
+COLOR_SPEED = 10
+
+
+class plugin:
     def __init__(self, config):
-        """
-        Initializations for the startup of the current wordclock plugin
-        """
-        # Get plugin name (according to the folder, it is contained in)
         self.name = os.path.dirname(__file__).split('/')[-1]
-        self.pretty_name = "Rainbow"
-        self.description = "Displays a nice rainbow"
+        self.pretty_name = 'Rainbow'
+        self.description = 'Displays a nice rainbow'
+        self.palette = [(color.r, color.g, color.b)
+                        for color in (self.wheel(i) for i in range(256))]
 
     def run(self, wcd, wci):
-        """
-        Displays time until aborted by user interaction on pin button_return
-        """
+        width, height = wcd.get_wca_width(), wcd.get_wca_height()
+        offsets = [x * y for y in range(height) for x in range(width)]
+        frame = bytearray((width * height + 4) * 3)
+        started = deadline = monotonic()
+        frames = 0
         while True:
-            """Draw rainbow that fades across all pixels at once."""
-            for j in range(256 * 5):
-                #for i in range(wcd.get_led_count()):
-                for x in range(wcd.get_wca_width()):
-                    for y in range(wcd.get_wca_height()):
-                        #wcd.setPixelColor(i, self.wheel((i + j) & 255))
-                        wcd.setColorBy2DCoordinates(x,y, self.wheel((x * y + j) & 255))
-                wcd.show()
-                if wci.waitForEvent(0.05) >= 0:
-                    return
+            position = (monotonic() - started) * COLOR_SPEED
+            base = int(position)
+            fraction = position - base
+            for index, offset in enumerate(offsets):
+                first = self.palette[(offset + base) & 255]
+                second = self.palette[(offset + base + 1) & 255]
+                for channel in range(3):
+                    frame[index * 3 + channel] = int(
+                        first[channel] + (second[channel] - first[channel]) * fraction)
+            wcd.show_rgb_frame(frame)
+            frames += 1
+            now = monotonic()
+            deadline = max(deadline + FRAME_PERIOD, now)
+            if wci.waitForEvent(deadline - now) >= 0:
+                duration = monotonic() - started
+                logging.info('rainbow: %d frames in %.2f s (%.2f fps)',
+                             frames, duration, frames / duration if duration else 0)
+                return
 
     def wheel(self, pos):
-        """
-        Generate rainbow colors across 0-255 positions.
-        """
         if pos < 85:
             return wcc.Color(pos * 3, 255 - pos * 3, 0)
-        elif pos < 170:
+        if pos < 170:
             pos -= 85
             return wcc.Color(255 - pos * 3, 0, pos * 3)
-        else:
-            pos -= 170
-            return wcc.Color(0, pos * 3, 255 - pos * 3)
+        pos -= 170
+        return wcc.Color(0, pos * 3, 255 - pos * 3)
